@@ -1,0 +1,62 @@
+======================================================================
+CUSTOMER FEEDBACK AI - BUSINESS SUMMARY
+======================================================================
+
+OVERALL CUSTOMER FEEDBACK
+----------------------------------------
+Total reviews analyzed: 20,995
+Negative reviews: 14,336 (68.28%)
+Neutral reviews: 881 (4.20%)
+Positive reviews: 5,778 (27.52%)
+
+Overall assessment: Customer sentiment is predominantly negative.
+
+TOP CUSTOMER CONCERNS
+----------------------------------------
+1. Delivery - 8,603 reviews (40.98%)
+2. Customer Service - 6,803 reviews (32.40%)
+3. Refund - 3,858 reviews (18.38%)
+4. Return - 2,889 reviews (13.76%)
+5. Price - 2,744 reviews (13.07%)
+
+MAJOR NEGATIVE CONCERNS
+----------------------------------------
+1. Delivery - 6,313 negative reviews
+2. Customer Service - 5,566 negative reviews
+3. Refund - 3,428 negative reviews
+4. Return - 2,395 negative reviews
+5. Payment - 2,252 negative reviews
+
+RECENT COMPLAINT TREND
+----------------------------------------
+Comparison period 1: 2024-04 to 2024-06
+Comparison period 2: 2024-07 to 2024-09
+Previous period complaints: 777
+Recent period complaints: 807
+Complaint change: 3.86%
+Trend: STABLE
+
+COMPLAINT SPIKES
+----------------------------------------
+- 2022-12: 364 complaints
+- 2023-01: 297 complaints
+- 2023-03: 295 complaints
+- 2023-06: 288 complaints
+- 2023-07: 293 complaints
+- 2023-11: 315 complaints
+- 2023-12: 318 complaints
+- 2024-06: 290 complaints
+- 2024-07: 331 complaints
+- 2024-08: 316 complaints
+
+BUSINESS INSIGHTS
+----------------------------------------
+- Delivery is the leading negative concern.
+- Customer Service is another major source of negative feedback.
+- Recent complaint volume is relatively stable.
+
+RECOMMENDATIONS
+----------------------------------------
+- Investigate delivery delays, shipping performance and logistics.
+- Improve customer service response times and issue resolution.
+- Review refund processing time and refund-related complaints.

@@ -1,0 +1,1 @@
+﻿print('SVC VALIDATION FILE WORKS')
