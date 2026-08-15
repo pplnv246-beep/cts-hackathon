@@ -851,7 +851,7 @@ document.addEventListener(
             "Customer Feedback AI frontend loaded"
         );
 
-        loadDashboard();
+        console.log("Waiting for CSV upload before loading dashboard");
 
     }
 );
