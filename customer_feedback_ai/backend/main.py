@@ -1,4 +1,20 @@
 import os
+import warnings
+
+warnings.filterwarnings("ignore")
+
+try:
+    import threadpoolctl
+    orig_find = getattr(threadpoolctl.ThreadpoolController, "_find_libraries_with_enum_process_module_ex", None)
+    if orig_find:
+        def safe_find(self):
+            try:
+                return orig_find(self)
+            except Exception:
+                return []
+        threadpoolctl.ThreadpoolController._find_libraries_with_enum_process_module_ex = safe_find
+except Exception:
+    pass
 
 from fastapi import (
     FastAPI,
@@ -6,17 +22,11 @@ from fastapi import (
     File,
     HTTPException
 )
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-
 from fastapi.staticfiles import StaticFiles
-
 from pydantic import BaseModel
 
-
-from backend.services.prediction_service import (
-    predict_sentiment
-)
 
 from backend.services.upload_service import (
     save_uploaded_csv,
@@ -56,6 +66,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ============================================================
 # PATHS
@@ -66,6 +84,26 @@ BASE_DIR = os.path.dirname(
         os.path.abspath(__file__)
     )
 )
+
+
+PROCESSED_DIR = os.path.join(
+    BASE_DIR,
+    "backend",
+    "data",
+    "processed"
+)
+
+
+STALE_ANALYSIS_FILES = {
+    "uploaded_analyzed_reviews.csv",
+    "cleaned_reviews.csv",
+    "nlp_ready_reviews.csv",
+    "complaint_monthly_trends.csv",
+    "concern_monthly_trends.csv",
+    "complaint_spikes.csv",
+    "concern_spikes.csv",
+    "ai_summary.txt"
+}
 
 
 FRONTEND_DIR = os.path.join(
@@ -80,13 +118,21 @@ INDEX_FILE = os.path.join(
 )
 
 
-# ============================================================
-# REQUEST MODEL
-# ============================================================
+def clear_stale_analysis_state():
+    """Ensure a brand-new open starts from an empty state."""
+    if not os.path.isdir(PROCESSED_DIR):
+        return
 
-class ReviewRequest(BaseModel):
+    for file_name in os.listdir(PROCESSED_DIR):
+        if file_name in STALE_ANALYSIS_FILES:
+            full_path = os.path.join(PROCESSED_DIR, file_name)
+            if os.path.isfile(full_path):
+                os.remove(full_path)
 
-    review: str
+
+@app.on_event("startup")
+def startup_cleanup():
+    clear_stale_analysis_state()
 
 
 # ============================================================
@@ -96,18 +142,14 @@ class ReviewRequest(BaseModel):
 @app.get("/")
 def root():
 
+    if os.path.exists(INDEX_FILE):
+        return FileResponse(INDEX_FILE)
+
     return {
-
-        "message":
-            "Customer Feedback AI API is running",
-
-        "dashboard":
-            "/dashboard",
-
-        "docs":
-            "/docs"
-
+        "message": "Customer Feedback AI API is running",
+        "docs": "/docs"
     }
+
 
 
 # ============================================================
@@ -152,52 +194,6 @@ def dashboard():
     return FileResponse(
         INDEX_FILE
     )
-
-
-# ============================================================
-# SINGLE REVIEW PREDICTION API
-# ============================================================
-
-@app.post("/predict")
-def predict(
-    request: ReviewRequest
-):
-
-    try:
-
-        result = predict_sentiment(
-            request.review
-        )
-
-        return {
-
-            "review":
-                request.review,
-
-            **result
-
-        }
-
-    except ValueError as e:
-
-        raise HTTPException(
-
-            status_code=400,
-
-            detail=str(e)
-
-        )
-
-    except Exception as e:
-
-        raise HTTPException(
-
-            status_code=500,
-
-            detail=
-                f"Prediction failed: {str(e)}"
-
-        )
 
 
 # ============================================================

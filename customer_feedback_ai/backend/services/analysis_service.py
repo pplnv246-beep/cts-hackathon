@@ -1,4 +1,21 @@
 import os
+import warnings
+
+warnings.filterwarnings("ignore")
+
+try:
+    import threadpoolctl
+    orig_find = getattr(threadpoolctl.ThreadpoolController, "_find_libraries_with_enum_process_module_ex", None)
+    if orig_find:
+        def safe_find(self):
+            try:
+                return orig_find(self)
+            except Exception:
+                return []
+        threadpoolctl.ThreadpoolController._find_libraries_with_enum_process_module_ex = safe_find
+except Exception:
+    pass
+
 import pandas as pd
 import joblib
 
@@ -58,6 +75,9 @@ os.makedirs(
 model = joblib.load(
     MODEL_PATH
 )
+
+if not hasattr(model, "multi_class"):
+    model.multi_class = "auto"
 
 vectorizer = joblib.load(
     VECTORIZER_PATH

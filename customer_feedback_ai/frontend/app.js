@@ -1,4 +1,6 @@
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = window.location.protocol.startsWith("http")
+    ? window.location.origin
+    : "http://127.0.0.1:8000";
 
 let sentimentChart = null;
 let concernChart = null;
@@ -7,8 +9,90 @@ let trendChart = null;
 
 
 // ============================================================
-// API HELPER
+// PARALLAX SCROLLING EFFECT
 // ============================================================
+
+window.addEventListener("scroll", () => {
+    const scrolled = window.pageYOffset;
+    const orb1 = document.querySelector(".glow-orb-1");
+    const orb2 = document.querySelector(".glow-orb-2");
+    const orb3 = document.querySelector(".glow-orb-3");
+    const rays = document.querySelector(".ambient-light-rays");
+
+    if (orb1) orb1.style.transform = `translate3d(0, ${scrolled * 0.15}px, 0)`;
+    if (orb2) orb2.style.transform = `translate3d(0, ${scrolled * -0.12}px, 0)`;
+    if (orb3) orb3.style.transform = `translate3d(0, ${scrolled * 0.08}px, 0)`;
+    if (rays) rays.style.transform = `translate3d(0, ${scrolled * 0.05}px, 0) rotate(-10deg)`;
+});
+
+
+// ============================================================
+// ANIME.JS MOTION ENGINE INITIALIZATION
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof anime !== "undefined") {
+        anime({
+            targets: ".upload-panel, .card, .review-panel, .panel, .insights",
+            translateY: [24, 0],
+            opacity: [0, 1],
+            delay: anime.stagger(100, { start: 150 }),
+            duration: 800,
+            easing: "easeOutCubic"
+        });
+
+        anime({
+            targets: ".header-3d-hero",
+            scale: [1, 1.05, 1],
+            rotate: [0, 2, 0],
+            duration: 6000,
+            easing: "easeInOutSine",
+            loop: true
+        });
+
+        document.querySelectorAll("button").forEach((btn) => {
+            btn.addEventListener("mouseenter", () => {
+                anime({
+                    targets: btn,
+                    scale: 1.03,
+                    duration: 300,
+                    easing: "easeOutQuad"
+                });
+            });
+            btn.addEventListener("mouseleave", () => {
+                anime({
+                    targets: btn,
+                    scale: 1.0,
+                    duration: 300,
+                    easing: "easeOutQuad"
+                });
+            });
+        });
+    }
+});
+
+
+// ============================================================
+// API HELPER & HEALTH CHECK
+// ============================================================
+
+async function checkAPIHealth() {
+    const statusElem = document.querySelector(".status");
+    if (!statusElem) return;
+    try {
+        const response = await fetch(`${API_BASE}/health`);
+        if (response.ok) {
+            statusElem.innerHTML = `<span class="status-dot"></span> API Connected`;
+            statusElem.style.color = "#16a34a";
+        } else {
+            statusElem.innerHTML = `<span class="status-dot" style="background-color: #ef4444;"></span> API Error`;
+            statusElem.style.color = "#dc2626";
+        }
+    } catch (e) {
+        statusElem.innerHTML = `<span class="status-dot" style="background-color: #ef4444;"></span> API Offline`;
+        statusElem.style.color = "#dc2626";
+    }
+}
 
 async function fetchAPI(endpoint) {
 
@@ -88,6 +172,14 @@ async function loadOverview() {
 // SENTIMENT CHART
 // ============================================================
 
+// ============================================================
+// SENTIMENT CHART
+// ============================================================
+
+// ============================================================
+// SENTIMENT CHART (DONUT OVERVIEW WITH PERMANENT SLICE LABELS)
+// ============================================================
+
 async function loadSentimentChart() {
 
     const result = await fetchAPI(
@@ -104,9 +196,60 @@ async function loadSentimentChart() {
         item => item.count
     );
 
+    const colorMap = {
+        "Negative": "#EF4444",
+        "Positive": "#10B981",
+        "Neutral": "#F59E0B"
+    };
+
+    const backgroundColors = labels.map(label => colorMap[label] || "#3B82F6");
+
     if (sentimentChart) {
         sentimentChart.destroy();
     }
+
+    const donutSliceDataLabelsPlugin = {
+        id: "donutSliceDataLabels",
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return;
+            const dataset = chart.data.datasets[0];
+            const total = dataset.data.reduce((a, b) => a + b, 0);
+
+            // Center Text
+            const { width, height, top, left } = chartArea;
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const centerX = left + width / 2;
+            const centerY = top + height / 2;
+
+            ctx.font = "bold 22px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#1E293B";
+            ctx.fillText(total.toLocaleString(), centerX, centerY - 8);
+
+            ctx.font = "600 13px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#64748B";
+            ctx.fillText("Total Reviews", centerX, centerY + 14);
+
+            // Permanent slice labels (percentage & count)
+            ctx.font = "bold 12px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#FFFFFF";
+
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((element, index) => {
+                const val = dataset.data[index];
+                if (val && total > 0) {
+                    const pct = ((val / total) * 100).toFixed(2);
+                    if (pct > 5) {
+                        const pos = element.tooltipPosition();
+                        ctx.fillText(`${pct}% (${val.toLocaleString()})`, pos.x, pos.y);
+                    }
+                }
+            });
+            ctx.restore();
+        }
+    };
 
     sentimentChart = new Chart(
         document.getElementById(
@@ -120,14 +263,50 @@ async function loadSentimentChart() {
 
                 datasets: [
                     {
-                        data: values
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: "#FFFFFF",
+                        borderWidth: 3,
+                        hoverOffset: 6
                     }
                 ]
             },
 
+            plugins: [donutSliceDataLabelsPlugin],
+
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                cutout: "68%",
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "bottom",
+                        labels: {
+                            font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                            color: "#1E293B",
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyle: "circle"
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: "#1E293B",
+                        titleFont: { size: 13, weight: "bold" },
+                        bodyFont: { size: 12 },
+                        padding: 10,
+                        cornerRadius: 6,
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const val = context.raw || 0;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
+                                return ` ${context.label}: ${val.toLocaleString()} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
             }
         }
     );
@@ -135,7 +314,7 @@ async function loadSentimentChart() {
 
 
 // ============================================================
-// CONCERN CHART
+// CONCERN CHART (HORIZONTAL BAR WITH PERMANENT EDGE LABELS)
 // ============================================================
 
 async function loadConcernChart() {
@@ -145,7 +324,7 @@ async function loadConcernChart() {
     );
 
     const data =
-        (result.data || []).slice(0, 9);
+        (result.data || []).slice(0, 8);
 
     const labels = data.map(
         item => item.concern
@@ -158,6 +337,26 @@ async function loadConcernChart() {
     if (concernChart) {
         concernChart.destroy();
     }
+
+    const barEdgeDataLabelsPlugin = {
+        id: "barEdgeDataLabels",
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            ctx.save();
+            ctx.font = "bold 12px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#1E293B";
+            ctx.textBaseline = "middle";
+
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((bar, index) => {
+                const val = chart.data.datasets[0].data[index];
+                if (val !== undefined && val !== null) {
+                    ctx.fillText(Number(val).toLocaleString(), bar.x + 8, bar.y);
+                }
+            });
+            ctx.restore();
+        }
+    };
 
     concernChart = new Chart(
         document.getElementById(
@@ -172,10 +371,17 @@ async function loadConcernChart() {
                 datasets: [
                     {
                         label: "Reviews",
-                        data: values
+                        data: values,
+                        backgroundColor: "#3B82F6",
+                        borderColor: "#2563EB",
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        borderSkipped: false
                     }
                 ]
             },
+
+            plugins: [barEdgeDataLabelsPlugin],
 
             options: {
                 indexAxis: "y",
@@ -184,9 +390,47 @@ async function loadConcernChart() {
 
                 maintainAspectRatio: false,
 
+                layout: {
+                    padding: {
+                        right: 55
+                    }
+                },
+
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: "#1E293B",
+                        titleFont: { size: 13, weight: "bold" },
+                        bodyFont: { size: 12 },
+                        padding: 10,
+                        cornerRadius: 6,
+                        callbacks: {
+                            label: function(context) {
+                                return ` Reviews: ${context.raw.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Review Frequency",
+                            color: "#1E293B",
+                            font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                            padding: { top: 6, bottom: 0 }
+                        },
+                        grid: { display: false },
+                        ticks: { font: { size: 12, weight: "600" }, color: "#1E293B" },
+                        beginAtZero: true
+                    },
+                    y: {
+                        grid: { color: "#F1F5F9", borderDash: [4, 4] },
+                        ticks: { font: { size: 13, weight: "500" }, color: "#1E293B" }
                     }
                 }
             }
@@ -196,7 +440,7 @@ async function loadConcernChart() {
 
 
 // ============================================================
-// CONCERN VS SENTIMENT
+// CONCERN VS SENTIMENT (GROUPED BAR WITH PERMANENT TOP LABELS)
 // ============================================================
 
 async function loadConcernSentimentChart() {
@@ -214,6 +458,29 @@ async function loadConcernSentimentChart() {
     if (concernSentimentChart) {
         concernSentimentChart.destroy();
     }
+
+    const groupedBarTopDataLabelsPlugin = {
+        id: "groupedBarTopDataLabels",
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            ctx.save();
+            ctx.font = "bold 11px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#1E293B";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+
+            chart.data.datasets.forEach((dataset, datasetIndex) => {
+                const meta = chart.getDatasetMeta(datasetIndex);
+                meta.data.forEach((bar, index) => {
+                    const val = dataset.data[index];
+                    if (val && val > 0) {
+                        ctx.fillText(Number(val).toLocaleString(), bar.x, bar.y - 3);
+                    }
+                });
+            });
+            ctx.restore();
+        }
+    };
 
     concernSentimentChart =
         new Chart(
@@ -234,7 +501,9 @@ async function loadConcernSentimentChart() {
                             data: data.map(
                                 item =>
                                     item.negative || 0
-                            )
+                            ),
+                            backgroundColor: "#EF4444",
+                            borderRadius: 4
                         },
 
                         {
@@ -243,7 +512,9 @@ async function loadConcernSentimentChart() {
                             data: data.map(
                                 item =>
                                     item.positive || 0
-                            )
+                            ),
+                            backgroundColor: "#10B981",
+                            borderRadius: 4
                         },
 
                         {
@@ -252,19 +523,71 @@ async function loadConcernSentimentChart() {
                             data: data.map(
                                 item =>
                                     item.neutral || 0
-                            )
+                            ),
+                            backgroundColor: "#F59E0B",
+                            borderRadius: 4
                         }
 
                     ]
                 },
+
+                plugins: [groupedBarTopDataLabelsPlugin],
 
                 options: {
                     responsive: true,
 
                     maintainAspectRatio: false,
 
+                    layout: {
+                        padding: {
+                            top: 18
+                        }
+                    },
+
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: "top",
+                            labels: {
+                                font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                                color: "#1E293B",
+                                padding: 16,
+                                usePointStyle: true,
+                                pointStyle: "circle"
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: "#1E293B",
+                            titleFont: { size: 13, weight: "bold" },
+                            bodyFont: { size: 12 },
+                            padding: 10,
+                            cornerRadius: 6
+                        }
+                    },
+
                     scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: "Concern Topics",
+                                color: "#1E293B",
+                                font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                                padding: { top: 6, bottom: 0 }
+                            },
+                            grid: { display: false },
+                            ticks: { font: { size: 12, weight: "600" }, color: "#1E293B" }
+                        },
                         y: {
+                            title: {
+                                display: true,
+                                text: "Number of Reviews",
+                                color: "#1E293B",
+                                font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                                padding: { top: 0, bottom: 6 }
+                            },
+                            grid: { color: "#F1F5F9", borderDash: [4, 4] },
+                            ticks: { font: { size: 12, weight: "600" }, color: "#475569" },
                             beginAtZero: true
                         }
                     }
@@ -275,7 +598,7 @@ async function loadConcernSentimentChart() {
 
 
 // ============================================================
-// TREND CHART
+// TREND CHART (CUSTOMER FEEDBACK TRENDS LINE CHART)
 // ============================================================
 
 async function loadTrendChart() {
@@ -319,9 +642,15 @@ async function loadTrendChart() {
 
                         data: totalReviews,
 
+                        borderColor: "#2563EB",
+
+                        backgroundColor: "rgba(37, 99, 235, 0.1)",
+
+                        borderWidth: 2,
+
                         tension: 0.3,
 
-                        fill: false
+                        fill: true
                     },
 
                     {
@@ -329,9 +658,15 @@ async function loadTrendChart() {
 
                         data: negativeReviews,
 
+                        borderColor: "#EF4444",
+
+                        backgroundColor: "rgba(239, 68, 68, 0.1)",
+
+                        borderWidth: 2,
+
                         tension: 0.3,
 
-                        fill: false
+                        fill: true
                     }
 
                 ]
@@ -342,8 +677,53 @@ async function loadTrendChart() {
 
                 maintainAspectRatio: false,
 
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "top",
+                        labels: {
+                            font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                            color: "#1E293B",
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyle: "circle"
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: "#1E293B",
+                        titleFont: { size: 13, weight: "bold" },
+                        bodyFont: { size: 12 },
+                        padding: 10,
+                        cornerRadius: 6
+                    }
+                },
+
                 scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Timeline",
+                            color: "#1E293B",
+                            font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                            padding: { top: 6, bottom: 0 }
+                        },
+                        grid: { display: true, color: "#f1f5f9" },
+                        ticks: {
+                            font: { size: 12, weight: "600" },
+                            color: "#1E293B"
+                        }
+                    },
                     y: {
+                        title: {
+                            display: true,
+                            text: "Review Count",
+                            color: "#1E293B",
+                            font: { size: 13, weight: "bold", family: "'Segoe UI', sans-serif" },
+                            padding: { top: 0, bottom: 6 }
+                        },
+                        grid: { color: "#F1F5F9" },
+                        ticks: { font: { size: 12, weight: "600" }, color: "#475569" },
                         beginAtZero: true
                     }
                 }
@@ -370,6 +750,8 @@ async function loadInsights() {
             "insightsContainer"
         );
 
+    if (!container) return;
+
     container.innerHTML = "";
 
     if (concerns.length === 0) {
@@ -382,86 +764,50 @@ async function loadInsights() {
         return;
     }
 
+    const ordinalLabels = [
+        "Top Customer Concern",
+        "Second Major Concern",
+        "Third Major Concern",
+        "Fourth Major Concern",
+        "Fifth Major Concern",
+        "Sixth Major Concern",
+        "Seventh Major Concern",
+        "Eighth Major Concern",
+        "Ninth Major Concern",
+        "Tenth Major Concern"
+    ];
+
     const topConcern = concerns[0];
 
+    // Card 1: Top Customer Concern
     container.innerHTML +=
         `<div class="insight">
-
-            <strong>
-                Top Customer Concern:
-            </strong>
-
-            ${topConcern.concern}
-
+            <strong class="insight-label">Top Customer Concern:</strong>
+            <span class="insight-value">${escapeHTML(topConcern.concern)}</span>
             —
-
-            ${Number(
-                topConcern.count
-            ).toLocaleString()}
-
-            reviews.
-
+            <span class="insight-value">${Number(topConcern.count).toLocaleString()} reviews.</span>
         </div>`;
 
-
+    // Card 2: Concern Percentage
     container.innerHTML +=
         `<div class="insight">
-
-            <strong>
-                Concern Percentage:
-            </strong>
-
-            ${topConcern.percentage}%
-
+            <strong class="insight-label">Concern Percentage:</strong>
+            <span class="insight-value">${topConcern.percentage}%</span>
             of all reviews mention
-
-            ${topConcern.concern}.
-
+            <span class="insight-value">${escapeHTML(topConcern.concern)}.</span>
         </div>`;
 
-
-    if (concerns.length >= 2) {
-
-        container.innerHTML +=
-            `<div class="insight">
-
-                <strong>
-                    Second Major Concern:
-                </strong>
-
-                ${concerns[1].concern}
-
-                —
-
-                ${Number(
-                    concerns[1].count
-                ).toLocaleString()}
-
-                reviews.
-
-            </div>`;
-    }
-
-
-    if (concerns.length >= 3) {
+    // Cards 3+: Subsequent concerns
+    for (let i = 1; i < concerns.length; i++) {
+        const item = concerns[i];
+        const label = i < ordinalLabels.length ? ordinalLabels[i] : `Major Concern #${i + 1}`;
 
         container.innerHTML +=
             `<div class="insight">
-
-                <strong>
-                    Third Major Concern:
-                </strong>
-
-                ${concerns[2].concern}
-
+                <strong class="insight-label">${label}:</strong>
+                <span class="insight-value">${escapeHTML(item.concern)}</span>
                 —
-
-                ${Number(
-                    concerns[2].count
-                ).toLocaleString()}
-
-                reviews.
-
+                <span class="insight-value">${Number(item.count).toLocaleString()} reviews.</span>
             </div>`;
     }
 }
@@ -575,224 +921,12 @@ async function analyzeCSV() {
 
 
 // ============================================================
-// SINGLE REVIEW ANALYSIS
-// ============================================================
-
-async function analyzeReview() {
-
-    console.log(
-        "Analyze Review button clicked"
-    );
-
-    const reviewInput =
-        document.getElementById(
-            "reviewInput"
-        );
-
-    const button =
-        document.getElementById(
-            "predictButton"
-        );
-
-    const status =
-        document.getElementById(
-            "predictionStatus"
-        );
-
-    const result =
-        document.getElementById(
-            "predictionResult"
-        );
-
-    const review =
-        reviewInput.value.trim();
-
-    if (!review) {
-
-        status.textContent =
-            "Please enter a customer review.";
-
-        result.style.display =
-            "none";
-
-        return;
-    }
-
-    button.disabled = true;
-
-    button.textContent =
-        "Analyzing...";
-
-    status.textContent =
-        "AI is analyzing the review...";
-
-    result.style.display =
-        "none";
-
-    try {
-
-        console.log(
-            "Sending review to /predict..."
-        );
-
-        const response =
-            await fetch(
-                `${API_BASE}/predict`,
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body: JSON.stringify({
-                        review: review
-                    })
-                }
-            );
-
-        const data =
-            await response.json();
-
-        console.log(
-            "Prediction response:",
-            data
-        );
-
-        if (!response.ok) {
-
-            throw new Error(
-                data.detail ||
-                "Prediction failed."
-            );
-        }
-
-        const sentiment =
-            data.sentiment || "Unknown";
-
-        document.getElementById(
-            "resultSentiment"
-        ).textContent =
-            sentiment;
-
-        const confidence =
-            Number(
-                data.confidence || 0
-            );
-
-        document.getElementById(
-            "resultConfidence"
-        ).textContent =
-            `${(
-                confidence * 100
-            ).toFixed(2)}%`;
-
-        const concerns =
-            data.concerns || [];
-
-        document.getElementById(
-            "resultConcerns"
-        ).textContent =
-            concerns.length > 0
-                ? concerns.join(", ")
-                : "No specific concerns detected";
-
-        const probabilityContainer =
-            document.getElementById(
-                "probabilityContainer"
-            );
-
-        probabilityContainer.innerHTML =
-            "";
-
-        const probabilities =
-            data.probabilities || {};
-
-        const probabilityOrder = [
-            "Negative",
-            "Neutral",
-            "Positive"
-        ];
-
-        probabilityOrder.forEach(
-            sentimentName => {
-
-                const value =
-                    Number(
-                        probabilities[
-                            sentimentName
-                        ] || 0
-                    );
-
-                const percentage =
-                    value * 100;
-
-                probabilityContainer.innerHTML +=
-                    `
-                    <div class="probability-row">
-
-                        <div class="probability-label">
-
-                            <span>
-                                ${sentimentName}
-                            </span>
-
-                            <span>
-                                ${percentage.toFixed(2)}%
-                            </span>
-
-                        </div>
-
-                        <div class="probability-bar">
-
-                            <div
-                                class="probability-fill"
-                                style="width: ${percentage}%"
-                            ></div>
-
-                        </div>
-
-                    </div>
-                    `;
-            }
-        );
-
-        result.style.display =
-            "block";
-
-        status.textContent =
-            "Analysis completed successfully.";
-
-    } catch (error) {
-
-        console.error(
-            "Review analysis failed:",
-            error
-        );
-
-        status.textContent =
-            `Analysis failed: ${error.message}`;
-
-        result.style.display =
-            "none";
-
-    } finally {
-
-        button.disabled =
-            false;
-
-        button.textContent =
-            "Analyze Review";
-    }
-}
-
-
-// ============================================================
 // LOAD DASHBOARD
 // ============================================================
 
 async function loadDashboard() {
+
+    checkAPIHealth();
 
     const container =
         document.getElementById(

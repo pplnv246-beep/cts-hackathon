@@ -32,11 +32,7 @@ ANALYZED_FILE = os.path.join(
 def load_analysis_data():
 
     if not os.path.exists(ANALYZED_FILE):
-
-        raise FileNotFoundError(
-            "Analyzed dataset not found. "
-            "Please run /analyze first."
-        )
+        return pd.DataFrame()
 
     df = pd.read_csv(
         ANALYZED_FILE,
@@ -54,6 +50,17 @@ def load_analysis_data():
 def get_overview():
 
     df = load_analysis_data()
+
+    if df.empty or "Predicted_Sentiment" not in df.columns:
+        return {
+            "total_reviews": 0,
+            "positive": 0,
+            "negative": 0,
+            "neutral": 0,
+            "positive_percentage": 0,
+            "negative_percentage": 0,
+            "neutral_percentage": 0,
+        }
 
     total_reviews = len(df)
 
@@ -136,6 +143,13 @@ def get_overview():
 def get_sentiment_distribution():
 
     df = load_analysis_data()
+
+    if df.empty or "Predicted_Sentiment" not in df.columns:
+        return [
+            {"sentiment": "Positive", "count": 0, "percentage": 0},
+            {"sentiment": "Negative", "count": 0, "percentage": 0},
+            {"sentiment": "Neutral", "count": 0, "percentage": 0},
+        ]
 
     counts = (
         df["Predicted_Sentiment"]
@@ -250,11 +264,10 @@ def get_concern_distribution():
 
     df = load_analysis_data()
 
-    concern_counts = {}
-
-    if "Detected_Concerns" not in df.columns:
-
+    if df.empty or "Detected_Concerns" not in df.columns:
         return []
+
+    concern_counts = {}
 
     for concerns in df[
         "Detected_Concerns"
@@ -316,6 +329,9 @@ def get_concern_distribution():
 def get_concern_sentiment():
 
     df = load_analysis_data()
+
+    if df.empty or "Detected_Concerns" not in df.columns or "Predicted_Sentiment" not in df.columns:
+        return []
 
     data = []
 
